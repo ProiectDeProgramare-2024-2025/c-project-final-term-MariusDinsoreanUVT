@@ -1,0 +1,281 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
+#include <string.h>
+
+struct Question {
+    char question[256];
+    char choices[4][256];
+    int correct_choice; 
+};
+
+struct Score {
+    char username[50];
+    float score;
+};
+
+struct Question questions[15] = {
+    {"What is the capital of France?", {"Paris", "London", "Berlin", "Madrid"}, 0},
+    {"What is 2 + 2?", {"3", "4", "5", "6"}, 1},
+    {"Which planet is known as the Red Planet?", {"Earth", "Mars", "Jupiter", "Venus"}, 1},
+    {"What is the largest ocean on Earth?", {"Atlantic", "Indian", "Arctic", "Pacific"}, 3},
+    {"Who wrote 'Romeo and Juliet'?", {"Charles Dickens", "William Shakespeare", "Jane Austen", "Mark Twain"}, 1},
+    {"What is the square root of 16?", {"2", "4", "8", "16"}, 1},
+    {"Which element has the chemical symbol 'O'?", {"Oxygen", "Gold", "Silver", "Iron"}, 0},
+    {"How many continents are there?", {"5", "6", "7", "8"}, 2},
+    {"What is the capital of Japan?", {"Beijing", "Seoul", "Tokyo", "Bangkok"}, 2},
+    {"Who painted the Mona Lisa?", {"Vincent van Gogh", "Pablo Picasso", "Leonardo da Vinci", "Claude Monet"}, 2},
+    {"What is the smallest prime number?", {"1", "2", "3", "5"}, 1},
+    {"Which gas do plants absorb from the atmosphere?", {"Oxygen", "Carbon Dioxide", "Nitrogen", "Helium"}, 1},
+    {"What is the hardest natural substance?", {"Gold", "Iron", "Diamond", "Platinum"}, 2},
+    {"Who developed the theory of relativity?", {"Isaac Newton", "Albert Einstein", "Galileo Galilei", "Nikola Tesla"}, 1},
+    {"What is the largest mammal?", {"Elephant", "Blue Whale", "Giraffe", "Hippopotamus"}, 1}
+};
+
+void clear_screen() {
+    system("clear");
+}
+
+void clear_input_buffer() {
+    int c;
+    while ((c = getchar()) != '\n' && c != EOF);
+}
+
+void save_score(char* name, float score) {
+    FILE* fp = fopen("scores.txt", "a");
+    if (fp == NULL) {
+        printf("Error opening file.\n");
+        return;
+    }
+    fprintf(fp, "%s %.1f\n", name, score);
+    fclose(fp);
+}
+
+void play_game() {
+    float score = 0.0;
+    int question_idx = 0;
+
+    while (question_idx < 15) {
+        struct Question q = questions[question_idx];
+        clear_screen();
+        printf("\033[0;33mQuestion %d\033[0m: \033[0;36m%s\033[0m\n", question_idx + 1, q.question);
+        for (int i = 0; i < 4; i++) {
+            printf("\033[0;32m%d. %s\033[0m\n", i + 1, q.choices[i]);
+        }
+
+        printf("Do you want to use 50/50? (y/n): ");
+        char use_5050;
+        scanf(" %c", &use_5050);
+        if (use_5050 != 'y' && use_5050 != 'Y' && use_5050 != 'n' && use_5050 != 'N') {
+            printf("Invalid input. Please enter y or n.\n");
+            clear_input_buffer();
+            getchar();
+            continue;
+        }
+
+        int available[4];
+        int num_available;
+        if (use_5050 == 'y' || use_5050 == 'Y') {
+            int incorrect;
+            do {
+                incorrect = rand() % 4;
+            } while (incorrect == q.correct_choice);
+            available[0] = q.correct_choice;
+            available[1] = incorrect;
+            num_available = 2;
+        } else {
+            for (int i = 0; i < 4; i++) available[i] = i;
+            num_available = 4;
+        }
+
+        printf("Available choices:\n");
+        for (int i = 0; i < num_available; i++) {
+            printf("\033[0;32m%d. %s\033[0m\n", i + 1, q.choices[available[i]]);
+        }
+
+        int choice;
+        printf("Enter your choice (number 1-%d): ", num_available);
+        if (scanf("%d", &choice) != 1) {
+            printf("Invalid input. Please enter a number between 1 and %d.\n", num_available);
+            clear_input_buffer();
+            getchar();
+            continue;
+        }
+
+        if (choice < 1 || choice > num_available) {
+            printf("Invalid choice. Please enter a number between 1 and %d.\n", num_available);
+            clear_input_buffer();
+            getchar();
+            continue;
+        }
+
+        int selected = available[choice - 1];
+        if (selected == q.correct_choice) {
+            score += (use_5050 == 'y' || use_5050 == 'Y') ? 0.5 : 1.0;
+            question_idx++;
+        } else {
+            printf("Incorrect answer. Game over.\n");
+            break;
+        }
+    }
+
+    clear_screen();
+    if (question_idx == 15) {
+        printf("Congratulations! You answered all questions correctly!\n");
+    }
+    printf("Your score: \033[0;32m%.1f\033[0m\n", score);
+    printf("Enter your name (max 49 characters, no spaces): ");
+    char name[50];
+    scanf("%s", name);
+    if (strlen(name) == 0 || strstr(name, " ") != NULL) {
+        printf("Invalid username. Must be non-empty and contain no spaces.\n");
+        printf("Enter your name (max 49 characters, no spaces): ");
+        scanf("%s", name);
+    }
+    save_score(name, score);
+}
+
+void view_leaderboard() {
+    clear_screen();
+    printf("Leaderboard:\n");
+    FILE* fp = fopen("scores.txt", "r");
+    if (fp == NULL) {
+        printf("No scores yet.\n");
+        return;
+    }
+
+    struct Score scores[100];
+    int num_scores = 0;
+    char line[100];
+    while (fgets(line, sizeof(line), fp) != NULL && num_scores < 100) {
+        sscanf(line, "%s %f", scores[num_scores].username, &scores[num_scores].score);
+        num_scores++;
+    }
+    fclose(fp);
+
+    for (int i = 0; i < num_scores - 1; i++) {
+        for (int j = 0; j < num_scores - i - 1; j++) {
+            if (scores[j].score < scores[j + 1].score) {
+                struct Score temp = scores[j];
+                scores[j] = scores[j + 1];
+                scores[j + 1] = temp;
+            }
+        }
+    }
+
+    for (int i = 0; i < num_scores; i++) {
+        printf("\033[0;34m%s\033[0m: \033[0;32m%.1f\033[0m\n", scores[i].username, scores[i].score);
+    }
+}
+
+void view_history() {
+    clear_screen();
+    char name_to_search[50];
+    printf("=== Player History ===\n\n");
+    printf("Enter player name to search (max 49 characters, no spaces): ");
+    scanf("%s", name_to_search);
+    clear_input_buffer();
+
+    FILE* fp = fopen("scores.txt", "r");
+    if (fp == NULL) {
+        printf("No scores found.\n");
+        return;
+    }
+
+    struct Score scores[100];
+    int num_scores = 0;
+    while (fscanf(fp, "%s %f", scores[num_scores].username, &scores[num_scores].score) == 2 && num_scores < 100) {
+        num_scores++;
+    }
+    fclose(fp);
+
+    int found = 0;
+    printf("History for \033[0;36m%s\033[0m:\n", name_to_search);
+    for (int i = 0; i < num_scores; i++) {
+        if (strcmp(scores[i].username, name_to_search) == 0) {
+            printf(" - Score: \033[0;32m%.1f\033[0m\n", scores[i].score);
+            found = 1;
+        }
+    }
+
+    if (!found) {
+        printf("No history found for \033[0;31m%s\033[0m.\n", name_to_search);
+    }
+
+    printf("\nPress Enter to return to main menu...");
+    getchar();
+}
+
+
+
+void initialize_scores_file() {
+    FILE* fp = fopen("scores.txt", "r");
+    if (fp == NULL) { 
+        fp = fopen("scores.txt", "w");
+        if (fp == NULL) {
+            printf("Error opening file.\n");
+            return;
+        }
+        fprintf(fp, "Player1 5.0\n");
+        fprintf(fp, "Player2 7.5\n");
+        fprintf(fp, "Player3 10.0\n");
+        fclose(fp);
+    } else { 
+        fclose(fp);
+    }
+}
+
+int main() {
+    srand(time(NULL));
+    initialize_scores_file(); 
+    int choice;
+
+    do {
+        clear_screen();
+        printf("Who Wants to Be a Millionaire?\n");
+        printf("\033[0;32m1. Play game\033[0m\n");
+        printf("\033[0;32m2. View leaderboard\033[0m\n");
+        printf("\033[0;32m3. View game history\033[0m\n");
+        printf("\033[0;32m4. Exit\033[0m\n");
+        printf("Enter your choice (number 1-4): ");
+        if (scanf("%d", &choice) != 1) {
+            printf("Invalid input. Please enter a number between 1 and 4.\n");
+            clear_input_buffer();
+            getchar();
+            continue;
+        }
+        clear_input_buffer();
+
+        if (choice < 1 || choice > 4) {
+            printf("Invalid choice. Please enter a number between 1 and 4.\n");
+            getchar();
+            continue;
+        }
+
+        switch (choice) {
+            case 1:
+                play_game();
+                break;
+            case 2:
+                view_leaderboard();
+                break;
+            case 3:
+                view_history();
+                break;
+            case 4:
+                clear_screen();
+                printf("Goodbye!\n");
+                break;
+            default:
+                printf("Invalid choice. Please enter a number between 1 and 4.\n");
+                break;
+        }
+
+        if (choice != 4) {
+            printf("\nPress Enter to continue...");
+            getchar();
+        }
+    } while (choice != 4);
+
+    return 0;
+}
